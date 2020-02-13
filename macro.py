@@ -43,14 +43,20 @@ def read (f,k=0):
 	f = open(f,'r')
 	c = eval(f.read())
 	f.close()
-	if not type(c) in (world,set,list,tuple):
-		raise TypeError("%s object isn't a world or valid iterable encoding"%c.__class__.__name__)
 
-	if type(c) != world:
-		c = eval(decode(c,k))
-		if type(c) != world:
-			raise KeyError('incorrect decoding key: %s' %k.__repr__())
+	while type(c) != world:
+		if not type(c) in (bytes,set,list,tuple):
+			raise TypeError("%s object isn't a world or valid iterable encoding"%c.__class__.__name__)
 
+		try:
+			if type(c) == bytes:
+				c = c.decode()
+			else:
+				c = decode(c,k)
+			c = eval(c)
+		except Exception as ex:
+			raise KeyError('incorrect decoding key: %s; %s' %(k.__repr__(),ex.__str__()))
+		
 	return c
 
 def write (f,c,p=None,k=None):
@@ -66,6 +72,14 @@ class world:
 		self.map	= w
 		self.key	= k
 		self.password=p
+		if type(w) in (set,tuple,list):
+			w = {}
+			for v in self.map:
+				try:
+					self.map[v.__name__] = v
+				except AttributeError:
+					continue
+			self.map = w
 		if type(w) == dict:
 			for v in w:
 				try:
@@ -73,7 +87,11 @@ class world:
 						continue 
 				except AttributeError:
 					pass
-				w[v].__setattr__('__name__',v)
+				try:
+					w[v].actions['__name__'] = v
+					w[v].run('__name__')
+				except AttributeError:
+					w[v].__setattr__('__name__',v)
 
 	def __str__ (self):
 		return self.__repr__()
@@ -88,7 +106,7 @@ class world:
 				k = self.key
 		if k != None:
 			return str(encode(str(self),k))
-		return str(self)
+		return str(self).encode()
 
 	def edit (self,n=None,p=None):
 		if p!=self.password:
@@ -107,7 +125,3 @@ class world:
 			except AttributeError:
 				continue
 		return world(*w)
-
-print(eval(decode(eval(world(123,123,5412435343124).show()))))
-print(eval(decode(eval(world(123,123,123).show()),123)))
-print(world(123,123,123).copy())
